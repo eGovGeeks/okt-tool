@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OKR-verktøy</title>
+
+  <!--
+    conf.js leses FØR app-scriptet starter.
+    Hvis filen mangler eller har feil vil window.OKR_CONFIG være undefined,
+    og verktøyet viser et konfigurasjonvarsel til brukeren.
+  -->
+  <script src="conf.js" onerror="window.__confMangler=true"></script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; background: #EEF2F7; color: #0F172A; min-height: 100vh; }
+    .heading { font-family: 'Outfit', sans-serif; }
+
+    .progress-track { height: 7px; border-radius: 99px; background: #E2E8F0; overflow: hidden; }
+    .progress-fill  { height: 100%; border-radius: 99px; transition: width 0.4s ease; }
+    .p-low  { background: linear-gradient(90deg,#F87171,#EF4444); }
+    .p-mid  { background: linear-gradient(90deg,#FBBF24,#F59E0B); }
+    .p-high { background: linear-gradient(90deg,#34D399,#10B981); }
+
+    .card { background: white; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04); }
+
+    .backdrop {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.45); backdrop-filter: blur(2px);
+      z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px;
+      animation: fadeIn 0.15s ease;
+    }
+    .modal { background: white; border-radius: 18px; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.2s ease; }
+
+    .btn-primary   { background: #1B3F6E; color: white; border-radius: 9px; padding: 9px 18px; font-size: 14px; font-weight: 500; font-family: 'DM Sans',sans-serif; cursor: pointer; border: none; transition: background 0.15s; white-space: nowrap; }
+    .btn-primary:hover   { background: #122D52; }
+    .btn-accent    { background: #0EA5E9; color: white; border-radius: 9px; padding: 9px 18px; font-size: 14px; font-weight: 500; font-family: 'DM Sans',sans-serif; cursor: pointer; border: none; transition: background 0.15s; white-space: nowrap; }
+    .btn-accent:hover    { background: #0284C7; }
+    .btn-secondary { background: #F1F5F9; color: #334155; border-radius: 9px; padding: 8px 14px; font-size: 13px; font-weight: 500; font-family: 'DM Sans',sans-serif; cursor: pointer; border: none; transition: background 0.15s; white-space: nowrap; }
+    .btn-secondary:hover { background: #E2E8F0; }
+    .btn-ghost     { background: transparent; color: #94A3B8; border-radius: 7px; padding: 5px 8px; font-size: 13px; cursor: pointer; border: none; transition: all 0.15s; line-height: 1; }
+    .btn-ghost:hover       { background: #F1F5F9; color: #475569; }
+    .btn-ghost.danger:hover { background: #FEE2E2; color: #DC2626; }
+
+    .field { width: 100%; border: 1.5px solid #E2E8F0; border-radius: 9px; padding: 9px 12px; font-size: 14px; font-family: 'DM Sans',sans-serif; outline: none; transition: border-color 0.15s, box-shadow 0.15s; background: white; color: #0F172A; }
+    .field:focus { border-color: #1B3F6E; box-shadow: 0 0 0 3px rgba(27,63,110,0.1); }
+    textarea.field { resize: vertical; }
+    select.field   { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 34px; }
+
+    .tag { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 99px; font-size: 11.5px; font-weight: 500; white-space: nowrap; }
+    .tag-blue  { background: #DBEAFE; color: #1D4ED8; }
+    .tag-green { background: #D1FAE5; color: #065F46; }
+    .tag-amber { background: #FEF3C7; color: #92400E; }
+    .tag-red   { background: #FEE2E2; color: #DC2626; }
+    .tag-gray  { background: #F1F5F9; color: #475569; }
+
+    .kr-block { border-left: 3px solid #E2E8F0; padding-left: 14px; transition: border-color 0.2s; }
+    .kr-block.open { border-left-color: #1B3F6E; }
+    .tiltak-item { background: #F8FAFC; border-radius: 9px; padding: 10px 13px; border: 1px solid #F1F5F9; }
+
+    .nav-item { padding: 6px 14px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; background: transparent; color: rgba(255,255,255,0.6); font-family: 'DM Sans',sans-serif; transition: all 0.15s; }
+    .nav-item:hover  { color: white; background: rgba(255,255,255,0.1); }
+    .nav-item.active { color: white; background: rgba(255,255,255,0.15); }
+
+    .label        { display: block; font-size: 13px; font-weight: 500; color: #475569; margin-bottom: 6px; }
+    .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #94A3B8; }
+
+    .conf-row { display: flex; gap: 8px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid #F8FAFC; }
+    .conf-key { font-size: 12px; font-weight: 600; color: #64748B; min-width: 90px; flex-shrink: 0; font-family: 'Outfit',sans-serif; }
+    .conf-val { font-size: 13px; color: #0F172A; font-family: monospace; }
+    .conf-val.empty { color: #CBD5E1; font-style: italic; }
+
+    .sync-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .pulsing { animation: pulse 1.2s ease-in-out infinite; }
+
+    .loading-screen { position: fixed; inset: 0; background: #1B3F6E; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; color: white; }
+    @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+    .spinner { width: 36px; height: 36px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.2); border-top-color: white; animation: spin 0.8s linear infinite; margin-bottom: 16px; }
+
+    @keyframes fadeIn  { from{opacity:0} to{opacity:1} }
+    @keyframes slideUp { from{opacity:0;transform:translateY(12px) scale(0.98)} to{opacity:1;transform:translateY(0) scale(1)} }
+    .anim-in { animation: fadeIn 0.2s ease; }
+    .empty-icon { font-size: 42px; margin-bottom: 12px; opacity: 0.5; }
+    ::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
+
+    /* Setup-banner */
+    .setup-banner { background: #FFF7ED; border: 1.5px solid #FED7AA; border-radius: 14px; padding: 20px 22px; }
+    .setup-banner code { background: #F1F5F9; padding: 2px 6px; border-radius: 5px; font-size: 12px; color: #1B3F6E; }
+  </style>
+</head>
+<body>
+
+<div id="loading" class="loading-screen">
+  <div class="heading" style="font-size:24px;font-weight:800;margin-bottom:24px;">◎ OKR</div>
+  <div class="spinner"></div>
+  <div id="loading-msg" style="font-size:14px;opacity:0.7;">Starter opp…</div>
+</div>
+
+<div id="app" style="display:none;"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// KONFIG — lest fra conf.js (window.OKR_CONFIG)
+// ═══════════════════════════════════════════════════════════════
+
+// Hent GitHub-konfig fra conf.js. Verdiene er skrivebeskyttet her —
+// de kan kun endres ved å redigere conf.js i repoet.
+const CONF = window.OKR_CONFIG?.github || null;
+
+function konfOK() {
+  return !!(CONF && CONF.owner && CONF.repo);
+}
+
+function konfFil() {
+  if (!CONF) return null;
+  return {
+    owner:    CONF.owner    || '',
+    repo:     CONF.repo     || '',
+    branch:   CONF.branch   || 'main',
+    dataFile: CONF.dataFile || 'okr-data.json'
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+const STORAGE_KEY = 'okr-v1';
+const SYNC_KEY    = 'okr-sync-v1';  // fileSha + sistSynk + pat
+const PAT_KEY     = 'okr-pat';
+
+let state = {
+  view:     'oversikt',
+  modal:    null,
+  filter:   { periode: '', eier: '' },
+  expanded: { objectives: new Set(), krs: new Set() },
+  teamMembers: [],
+  objectives:  []
+};
+
+let sync = {
+  status:   'idle',   // 'idle' | 'laster' | 'ok' | 'feil'
+  sistSynk: null,
+  fileSha:  null,
+  melding:  '',
+  pat:      ''        // Lagres kryptert i localStorage, aldri i conf.js
+};
+
+// ═══════════════════════════════════════════════════════════════
+// LAGRING
+// ═══════════════════════════════════════════════════════════════
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    state.teamMembers = d.teamMembers || [];
+    state.objectives  = d.objectives  || [];
+  } catch(e) {}
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    teamMembers: state.teamMembers,
+    objectives:  state.objectives
+  }));
+}
+
+function loadSync() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SYNC_KEY) || '{}');
+    sync.fileSha  = d.fileSha  || null;
+    sync.sistSynk = d.sistSynk || null;
+    sync.pat      = d.pat      || localStorage.getItem(PAT_KEY) || '';
+    if (d.sistSynk) sync.status = 'ok';
+  } catch(e) {}
+}
+
+function saveSync() {
+  localStorage.setItem(SYNC_KEY, JSON.stringify({
+    fileSha:  sync.fileSha,
+    sistSynk: sync.sistSynk,
+    pat:      sync.pat
+  }));
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+// ═══════════════════════════════════════════════════════════════
+// GITHUB API
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Leser okr-data fra GitHub ved hjelp av Contents API.
+ * Konfigurasjonen (owner, repo, branch, dataFile) hentes
+ * utelukkende fra conf.js — aldri fra localStorage.
+ */
+async function fetchFraGitHub() {
+  if (!konfOK()) return;
+  const kf = konfFil();
+
+  sync.status  = 'laster';
+  sync.melding = '';
+  oppdaterBadge();
+
+  try {
+    const url     = `https://api.github.com/repos/${enc(kf.owner)}/${enc(kf.repo)}/contents/${kf.dataFile}?ref=${enc(kf.branch)}`;
+    const headers = { Accept: 'application/vnd.github.v3+json' };
+    if (sync.pat) headers.Authorization = `token ${sync.pat}`;
+
+    const res = await fetch(url, { headers });
+
+    if (res.status === 404) {
+      sync.status   = 'ok';
+      sync.sistSynk = new Date().toISOString();
+      sync.melding  = `Datafilen «${kf.dataFile}» finnes ikke i repoet ennå. Trykk «Lagre til GitHub» for å opprette den.`;
+      saveSync(); oppdaterBadge(); return;
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(res.status === 401
+        ? 'Ugyldig PAT — sjekk at tokenet er gyldig og ikke utløpt'
+        : 'Ingen tilgang — sjekk at PAT har Contents-rettigheter for dette repoet');
+    }
+
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.message || `GitHub svarte med ${res.status} ${res.statusText}`);
+    }
+
+    const file      = await res.json();
+    sync.fileSha    = file.sha;
+    const decoded   = decodeURIComponent(escape(atob(file.content.replace(/\n/g,''))));
+    const data      = JSON.parse(decoded);
+
+    state.teamMembers = data.teamMembers || [];
+    state.objectives  = data.objectives  || [];
+
+    sync.status   = 'ok';
+    sync.sistSynk = new Date().toISOString();
+    sync.melding  = '';
+
+    save();
+    saveSync();
+    render();
+
+  } catch(err) {
+    sync.status  = 'feil';
+    sync.melding = err.message;
+    console.error('GitHub fetch:', err);
+    oppdaterBadge();
+  }
+}
+
+/**
+ * Skriver gjeldende state til GitHub via Contents API (PUT).
+ * Krever PAT med Contents: Read & write for repoet.
+ */
+async function lagreTilGitHub() {
+  if (!konfOK()) return alert('conf.js er ikke konfigurert.');
+  if (!sync.pat) return alert('Personal Access Token (PAT) mangler.\nLegg inn PAT under "Team & GitHub".');
+
+  sync.status  = 'laster';
+  sync.melding = '';
+  oppdaterBadge();
+
+  try {
+    const kf      = konfFil();
+    const innhold = JSON.stringify({ teamMembers: state.teamMembers, objectives: state.objectives }, null, 2);
+    const encoded = btoa(unescape(encodeURIComponent(innhold)));
+    const body    = {
+      message: `Oppdater OKR-data (${new Date().toLocaleDateString('no-NB')})`,
+      content: encoded,
+      branch:  kf.branch
+    };
+    if (sync.fileSha) body.sha = sync.fileSha;
+
+    const url = `https://api.github.com/repos/${enc(kf.owner)}/${enc(kf.repo)}/contents/${kf.dataFile}`;
+    const res = await fetch(url, {
+      method:  'PUT',
+      headers: { Authorization: `token ${sync.pat}`, 'Content-Type': 'application/json', Accept: 'application/vnd.github.v3+json' },
+      body:    JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.message || `GitHub svarte med ${res.status}`);
+    }
+
+    const result  = await res.json();
+    sync.fileSha  = result.content.sha;
+    sync.status   = 'ok';
+    sync.sistSynk = new Date().toISOString();
+    sync.melding  = '';
+    saveSync();
+    render();
+
+  } catch(err) {
+    sync.status  = 'feil';
+    sync.melding = err.message;
+    console.error('GitHub lagre:', err);
+    oppdaterBadge();
+  }
+}
+
+function lagrePAT() {
+  const ny = val('f-pat');
+  sync.pat = ny;
+  saveSync();
+  render();
+  if (konfOK() && ny) fetchFraGitHub();
+}
+
+function enc(s) { return encodeURIComponent(s); }
+
+function oppdaterBadge() {
+  const el = document.getElementById('sync-badge');
+  if (el) el.innerHTML = renderBadge();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BEREGNING
+// ═══════════════════════════════════════════════════════════════
+function krFremdrift(kr) {
+  const s=parseFloat(kr.start)||0, m=parseFloat(kr.maal)||0, n=parseFloat(kr.naa)||0;
+  if (m===s) return n>=m?100:0;
+  return Math.min(100,Math.max(0,Math.round((n-s)/(m-s)*100)));
+}
+function objFremdrift(obj) {
+  const krs=obj.nrs||[]; if (!krs.length) return 0;
+  return Math.round(krs.reduce((a,k)=>a+krFremdrift(k),0)/krs.length);
+}
+function pCls(p) { return p>=67?'p-high':p>=34?'p-mid':'p-low'; }
+
+// ═══════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════
+function h(s) {
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function val(id)    { return document.getElementById(id)?.value?.trim()||''; }
+function numVal(id) { return document.getElementById(id)?.value||'0'; }
+function dl(id) {
+  return `<datalist id="${id}">${state.teamMembers.map(m=>`<option value="${h(m.navn)}">`).join('')}</datalist>`;
+}
+
+const I = {
+  edit:  s=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
+  trash: s=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`,
+  chev:  (s,d)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transform:rotate(${d}deg);transition:transform 0.2s;"><polyline points="9 18 15 12 9 6"/></svg>`,
+  dl:    s=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:-2px;margin-right:4px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  ul:    s=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:-2px;margin-right:4px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`,
+};
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+function render() {
+  document.getElementById('app').innerHTML =
+    renderNav() +
+    `<main style="max-width:920px;margin:0 auto;padding:28px 16px 60px;">` +
+      (state.view==='oversikt' ? renderOversikt() : renderTeam()) +
+    `</main>` +
+    (state.modal ? renderModal() : '');
+  document.onkeydown = e => { if (e.key==='Escape' && state.modal) lukkModal(); };
+}
+
+// ── Sync badge ──
+function renderBadge() {
+  if (!konfOK()) return '';
+  const s = sync;
+  if (s.status==='laster') return `
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.7);">
+      <div class="sync-dot pulsing" style="background:#94A3B8;"></div>Synkroniserer…</div>`;
+  if (s.status==='feil') return `
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#FCA5A5;cursor:pointer;"
+         onclick="fetchFraGitHub()" title="${h(s.melding)}">
+      <div class="sync-dot" style="background:#EF4444;"></div>Synk feilet — klikk for å prøve igjen</div>`;
+  if (s.status==='ok' && s.sistSynk) {
+    const t = new Date(s.sistSynk).toLocaleTimeString('no-NB',{hour:'2-digit',minute:'2-digit'});
+    return `
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.55);">
+        <div class="sync-dot" style="background:#34D399;"></div>Synkronisert ${t}
+        <button onclick="fetchFraGitHub()" title="Hent siste fra GitHub"
+                style="background:transparent;border:none;color:rgba(255,255,255,0.4);cursor:pointer;padding:0 2px;font-size:16px;line-height:1;">↻</button>
+      </div>`;
+  }
+  return `<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.4);">
+    <div class="sync-dot" style="background:#475569;"></div>Ikke synkronisert</div>`;
+}
+
+// ── Nav ──
+function renderNav() {
+  const perioder = [...new Set(state.objectives.map(o=>o.periode).filter(Boolean))];
+  const eiere    = [...new Set([...state.objectives.map(o=>o.eier),...state.teamMembers.map(m=>m.navn)].filter(Boolean))];
+  return `
+    <header style="background:linear-gradient(135deg,#1B3F6E 0%,#0F2A4A 100%);position:sticky;top:0;z-index:40;box-shadow:0 2px 12px rgba(15,23,42,0.2);">
+      <div style="max-width:920px;margin:0 auto;padding:0 16px;height:60px;display:flex;align-items:center;gap:12px;">
+        <div class="heading" style="font-size:19px;font-weight:800;color:white;letter-spacing:-0.5px;margin-right:8px;white-space:nowrap;">◎ OKR</div>
+        <div style="display:flex;gap:2px;">
+          <button class="nav-item ${state.view==='oversikt'?'active':''}" onclick="setView('oversikt')">Oversikt</button>
+          <button class="nav-item ${state.view==='team'?'active':''}" onclick="setView('team')">Team & GitHub</button>
+        </div>
+        <div style="flex:1;"></div>
+        <div id="sync-badge" style="flex-shrink:0;">${renderBadge()}</div>
+        ${state.view==='oversikt' ? `
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select class="field" style="background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.15);color:white;width:auto;padding:7px 30px 7px 10px;font-size:13px;" onchange="setFilter('periode',this.value)">
+              <option value="" style="color:#0F172A;background:white;">Alle perioder</option>
+              ${perioder.map(p=>`<option value="${h(p)}" style="color:#0F172A;background:white;" ${state.filter.periode===p?'selected':''}>${h(p)}</option>`).join('')}
+            </select>
+            <select class="field" style="background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.15);color:white;width:auto;padding:7px 30px 7px 10px;font-size:13px;" onchange="setFilter('eier',this.value)">
+              <option value="" style="color:#0F172A;background:white;">Alle eiere</option>
+              ${eiere.map(e=>`<option value="${h(e)}" style="color:#0F172A;background:white;" ${state.filter.eier===e?'selected':''}>${h(e)}</option>`).join('')}
+            </select>
+            <button class="btn-accent" onclick="openModal('maal')">+ Nytt mål</button>
+          </div>` : ''}
+      </div>
+    </header>`;
+}
+
+// ── Oversikt ──
+function renderOversikt() {
+  let list = state.objectives;
+  if (state.filter.periode) list = list.filter(o=>o.periode===state.filter.periode);
+  if (state.filter.eier)    list = list.filter(o=>o.eier===state.filter.eier);
+  if (!list.length) return `
+    <div class="anim-in" style="text-align:center;padding:80px 20px;color:#94A3B8;">
+      <div class="empty-icon">◎</div>
+      <div class="heading" style="font-size:22px;font-weight:700;color:#334155;margin-bottom:8px;">
+        ${state.filter.periode||state.filter.eier?'Ingen mål for dette filteret':'Ingen mål ennå'}</div>
+      <div style="font-size:15px;margin-bottom:24px;">
+        ${state.filter.periode||state.filter.eier?'Prøv å endre filteret':'Opprett ditt første mål for å komme i gang'}</div>
+      ${!state.filter.periode&&!state.filter.eier?`<button class="btn-accent" onclick="openModal('maal')">+ Opprett mål</button>`:''}
+    </div>`;
+  return `<div class="anim-in" style="display:flex;flex-direction:column;gap:16px;">${list.map(renderObjCard).join('')}</div>`;
+}
+
+function renderObjCard(obj) {
+  const fp=objFremdrift(obj), open=state.expanded.objectives.has(obj.id);
+  const nrCnt=(obj.nrs||[]).length;
+  const totT=(obj.nrs||[]).reduce((a,k)=>a+(k.tiltak||[]).length,0);
+  const doneT=(obj.nrs||[]).reduce((a,k)=>a+(k.tiltak||[]).filter(t=>t.status==='fullfort').length,0);
+  return `
+    <div class="card">
+      <div style="padding:20px 20px 16px;">
+        <div style="display:flex;align-items:flex-start;gap:10px;">
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+              ${obj.periode?`<span class="tag tag-blue">${h(obj.periode)}</span>`:''}
+              ${obj.eier?`<span class="tag tag-gray">${h(obj.eier)}</span>`:''}
+            </div>
+            <h3 class="heading" style="font-size:17px;font-weight:700;line-height:1.3;margin-bottom:${obj.beskrivelse?'6px':'12px'};">${h(obj.tittel)}</h3>
+            ${obj.beskrivelse?`<p style="font-size:13px;color:#64748B;line-height:1.5;margin-bottom:12px;">${h(obj.beskrivelse)}</p>`:''}
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="flex:1;max-width:220px;">
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:#64748B;margin-bottom:5px;">
+                  <span>Fremdrift</span><span style="font-weight:600;color:#0F172A;">${fp}%</span>
+                </div>
+                <div class="progress-track"><div class="progress-fill ${pCls(fp)}" style="width:${fp}%"></div></div>
+              </div>
+              <div style="font-size:12px;color:#94A3B8;">${nrCnt} NR &nbsp;·&nbsp; ${doneT}/${totT} tiltak</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:2px;flex-shrink:0;">
+            <button class="btn-ghost" onclick="openModal('maal','${obj.id}')">${I.edit(15)}</button>
+            <button class="btn-ghost danger" onclick="slettMaal('${obj.id}')">${I.trash(15)}</button>
+            <button class="btn-ghost" onclick="toggleObj('${obj.id}')">${I.chev(16,open?90:0)}</button>
+          </div>
+        </div>
+      </div>
+      ${open?`
+        <div style="border-top:1px solid #F1F5F9;padding:16px 20px 20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <span class="section-title">Nøkkelresultater</span>
+            <button class="btn-secondary" style="font-size:12px;padding:5px 10px;" onclick="openModal('nr',null,'${obj.id}')">+ Legg til NR</button>
+          </div>
+          ${!(obj.nrs||[]).length?`<p style="font-size:13px;color:#CBD5E1;padding:8px 0;">Ingen nøkkelresultater ennå.</p>`
+            :(obj.nrs||[]).map(kr=>renderNR(kr,obj.id)).join('')}
+        </div>` : ''}
+    </div>`;
+}
+
+function renderNR(kr, objId) {
+  const fp=krFremdrift(kr), open=state.expanded.krs.has(kr.id);
+  return `
+    <div class="kr-block ${open?'open':''}" style="margin-bottom:14px;">
+      <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:5px;">
+            <span style="font-size:14px;font-weight:600;">${h(kr.tittel)}</span>
+            ${kr.eier?`<span class="tag tag-gray" style="font-size:11px;">${h(kr.eier)}</span>`:''}
+          </div>
+          <div style="font-size:12px;color:#64748B;margin-bottom:7px;">
+            ${h(kr.start??'0')} → <strong style="color:#0F172A;">${h(kr.naa??kr.start??'0')}</strong> / ${h(kr.maal??'100')}${kr.enhet?' '+h(kr.enhet):''}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="progress-track" style="flex:1;max-width:150px;"><div class="progress-fill ${pCls(fp)}" style="width:${fp}%"></div></div>
+            <span style="font-size:12px;font-weight:600;">${fp}%</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:2px;flex-shrink:0;">
+          <button class="btn-ghost" onclick="openModal('nr','${kr.id}','${objId}')">${I.edit(13)}</button>
+          <button class="btn-ghost danger" onclick="slettNR('${objId}','${kr.id}')">${I.trash(13)}</button>
+          <button class="btn-ghost" onclick="toggleNR('${kr.id}')">${I.chev(14,open?90:0)}</button>
+        </div>
+      </div>
+      ${open?`
+        <div style="padding-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="section-title">Tiltak</span>
+            <button class="btn-secondary" style="font-size:11px;padding:4px 9px;" onclick="openModal('tiltak',null,'${objId}','${kr.id}')">+ Legg til tiltak</button>
+          </div>
+          ${!(kr.tiltak||[]).length?`<p style="font-size:12px;color:#CBD5E1;padding:6px 0;">Ingen tiltak ennå.</p>`
+            :(kr.tiltak||[]).map(t=>renderTiltak(t,objId,kr.id)).join('')}
+        </div>` : ''}
+    </div>`;
+}
+
+function renderTiltak(t, objId, krId) {
+  const L={'ikke-startet':'Ikke startet','pagaar':'Pågår','fullfort':'Fullført'};
+  const C={'ikke-startet':'tag-gray','pagaar':'tag-blue','fullfort':'tag-green'};
+  return `
+    <div class="tiltak-item" style="display:flex;align-items:flex-start;gap:8px;margin-bottom:7px;">
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:3px;">
+          <span style="font-size:13px;${t.status==='fullfort'?'text-decoration:line-through;color:#94A3B8;':''}">${h(t.tittel)}</span>
+          <span class="tag ${C[t.status]||'tag-gray'}">${L[t.status]||h(t.status)}</span>
+        </div>
+        ${t.ansvarlig||t.frist?`<div style="font-size:11px;color:#94A3B8;display:flex;gap:10px;">
+          ${t.ansvarlig?`<span>👤 ${h(t.ansvarlig)}</span>`:''}${t.frist?`<span>📅 ${h(t.frist)}</span>`:''}</div>`:''}
+        ${t.beskrivelse?`<div style="font-size:12px;color:#94A3B8;margin-top:3px;">${h(t.beskrivelse)}</div>`:''}
+      </div>
+      <div style="display:flex;gap:2px;flex-shrink:0;">
+        <button class="btn-ghost" onclick="openModal('tiltak','${t.id}','${objId}','${krId}')">${I.edit(12)}</button>
+        <button class="btn-ghost danger" onclick="slettTiltak('${objId}','${krId}','${t.id}')">${I.trash(12)}</button>
+      </div>
+    </div>`;
+}
+
+// ── Team & GitHub ──
+function renderTeam() {
+  const kf = konfFil();
+  const konfMangler = window.__confMangler || !CONF;
+  const konfUfullstendig = CONF && (!CONF.owner || !CONF.repo);
+
+  return `
+    <div class="anim-in" style="max-width:580px;">
+
+      <!-- ── Konfigurasjonsvarsler ── -->
+      ${konfMangler ? `
+        <div class="setup-banner" style="margin-bottom:28px;">
+          <div class="heading" style="font-size:16px;font-weight:700;color:#C2410C;margin-bottom:10px;">
+            ⚙️ conf.js er ikke lastet inn
+          </div>
+          <p style="font-size:13px;color:#7C2D12;line-height:1.7;margin-bottom:12px;">
+            Verktøyet fant ikke konfigurasjonsfilen <code>conf.js</code> i repoet.
+            Uten denne filen vet ikke verktøyet hvilket GitHub-repo det skal lese og skrive data til.
+          </p>
+          <div style="font-size:13px;color:#7C2D12;line-height:1.8;">
+            <strong>Slik fikser du det:</strong><br>
+            1. Last ned <code>conf.js</code> fra repoet (eller bruk filen som fulgte med verktøyet)<br>
+            2. Fyll inn <code>owner</code> og <code>repo</code> i filen<br>
+            3. Commit og push til GitHub — verktøyet fungerer etter neste sideinnlasting
+          </div>
+        </div>
+      ` : konfUfullstendig ? `
+        <div class="setup-banner" style="margin-bottom:28px;">
+          <div class="heading" style="font-size:16px;font-weight:700;color:#C2410C;margin-bottom:10px;">
+            ⚙️ conf.js er ikke fullstendig utfylt
+          </div>
+          <p style="font-size:13px;color:#7C2D12;line-height:1.7;">
+            <code>conf.js</code> ble lastet, men <code>owner</code>${!CONF.owner?' (GitHub-bruker)':''} 
+            ${!CONF.repo?'og <code>repo</code> (repo-navn) ':''} mangler.
+            Rediger <code>conf.js</code> i repoet og commit endringene.
+          </p>
+        </div>
+      ` : ''}
+
+      <!-- ── Teammedlemmer ── -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h2 class="heading" style="font-size:22px;font-weight:700;">Teammedlemmer</h2>
+        <button class="btn-primary" onclick="openModal('medlem')">+ Legg til</button>
+      </div>
+
+      ${!state.teamMembers.length ? `
+        <div style="text-align:center;padding:40px 20px;color:#94A3B8;margin-bottom:32px;">
+          <div class="empty-icon">👥</div>
+          <div style="font-size:14px;">Legg til teammedlemmer for å tildele ansvar</div>
+        </div>` : `
+        <div class="card" style="margin-bottom:32px;">
+          ${state.teamMembers.map((m,i)=>`
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;${i<state.teamMembers.length-1?'border-bottom:1px solid #F1F5F9;':''}">
+              <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#1B3F6E,#0F2A4A);color:white;display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;flex-shrink:0;">
+                ${h(m.navn.charAt(0).toUpperCase())}
+              </div>
+              <div style="flex:1;">
+                <div style="font-weight:500;font-size:14px;">${h(m.navn)}</div>
+                ${m.rolle?`<div style="font-size:12px;color:#94A3B8;">${h(m.rolle)}</div>`:''}
+              </div>
+              <div style="display:flex;gap:2px;">
+                <button class="btn-ghost" onclick="openModal('medlem','${m.id}')">${I.edit(14)}</button>
+                <button class="btn-ghost danger" onclick="slettMedlem('${m.id}')">${I.trash(14)}</button>
+              </div>
+            </div>`).join('')}
+        </div>`}
+
+      <!-- ── GitHub-synkronisering ── -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+        <h2 class="heading" style="font-size:20px;font-weight:700;">GitHub-synkronisering</h2>
+        ${konfOK() ? `
+          <span class="tag ${sync.status==='ok'?'tag-green':sync.status==='feil'?'tag-red':'tag-gray'}">
+            ${sync.status==='ok'?'Tilkoblet':sync.status==='feil'?'Feil':'Ikke synkronisert'}
+          </span>` : `<span class="tag tag-amber">Ikke konfigurert</span>`}
+      </div>
+
+      <!-- Konfig lest fra conf.js (skrivebeskyttet) -->
+      ${kf ? `
+        <div style="margin-bottom:16px;">
+          <div class="section-title" style="margin-bottom:8px;">Konfigurasjon — lest fra conf.js</div>
+          <div class="card" style="padding:4px 18px;">
+            <div class="conf-row">
+              <span class="conf-key">owner</span>
+              <span class="conf-val ${kf.owner?'':'empty'}">${kf.owner||'— ikke satt'}</span>
+            </div>
+            <div class="conf-row">
+              <span class="conf-key">repo</span>
+              <span class="conf-val ${kf.repo?'':'empty'}">${kf.repo||'— ikke satt'}</span>
+            </div>
+            <div class="conf-row">
+              <span class="conf-key">branch</span>
+              <span class="conf-val">${h(kf.branch)}</span>
+            </div>
+            <div class="conf-row" style="border-bottom:none;">
+              <span class="conf-key">dataFile</span>
+              <span class="conf-val">${h(kf.dataFile)}</span>
+            </div>
+          </div>
+          <div style="font-size:11.5px;color:#94A3B8;margin-top:6px;">
+            For å endre disse verdiene: rediger <code style="background:#F1F5F9;padding:1px 5px;border-radius:4px;font-size:11px;">conf.js</code> i repoet og commit endringene.
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- PAT-seksjon -->
+      <div class="card" style="padding:22px;margin-bottom:16px;">
+        <div style="margin-bottom:6px;">
+          <label class="label" style="font-size:14px;font-weight:600;color:#0F172A;">
+            Personal Access Token (PAT)
+          </label>
+          <p style="font-size:13px;color:#64748B;line-height:1.6;margin-bottom:14px;">
+            Påkrevd for å skrive til GitHub og for å lese fra private repos.
+            Tokenet lagres kun i denne nettleseren — det skrives aldri til conf.js eller GitHub.
+          </p>
+          <input class="field" id="f-pat" type="password"
+                 placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                 value="${h(sync.pat)}" autocomplete="new-password">
+          <div style="font-size:11.5px;color:#94A3B8;margin-top:6px;">
+            github.com → Settings → Developer settings → Personal access tokens → Fine-grained tokens.
+            Krev: <em>Contents: Read &amp; write</em> for dette repoet.
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;">
+          <button class="btn-primary" onclick="lagrePAT()">Lagre PAT</button>
+          ${sync.pat ? `<button class="btn-secondary" onclick="sync.pat='';saveSync();render();" style="color:#DC2626;">Fjern PAT</button>` : ''}
+        </div>
+
+        <!-- Synkroniseringsstatus og feilmelding -->
+        ${sync.melding ? `
+          <div style="margin-top:14px;padding:10px 14px;border-radius:9px;font-size:13px;
+                      background:${sync.status==='feil'?'#FEF2F2':'#F0FDF4'};
+                      color:${sync.status==='feil'?'#DC2626':'#15803D'};">
+            ${sync.status==='feil'?'⚠️':'ℹ️'} ${h(sync.melding)}
+          </div>` : ''}
+      </div>
+
+      <!-- Synk-knapper -->
+      ${konfOK() ? `
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+          <button class="btn-secondary" onclick="fetchFraGitHub()">↓ Hent fra GitHub</button>
+          <button class="btn-secondary" onclick="lagreTilGitHub()">↑ Lagre til GitHub</button>
+        </div>
+        ${sync.sistSynk ? `
+          <div style="font-size:12px;color:#94A3B8;margin-bottom:24px;">
+            Sist synkronisert: ${new Date(sync.sistSynk).toLocaleString('no-NB')}
+            ${sync.fileSha?` · SHA: <code style="font-size:11px;">${sync.fileSha.slice(0,8)}…</code>`:''}
+          </div>` : '<div style="margin-bottom:24px;"></div>'}
+      ` : ''}
+
+      <!-- Lokal data -->
+      <div>
+        <div class="section-title" style="margin-bottom:12px;">Lokal data</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn-secondary" onclick="eksporter()">${I.dl(14)}Eksporter JSON</button>
+          <label class="btn-secondary" style="cursor:pointer;display:inline-flex;align-items:center;">
+            ${I.ul(14)}Importer JSON
+            <input type="file" accept=".json" style="display:none;" onchange="importer(event)">
+          </label>
+        </div>
+      </div>
+
+    </div>`;
+}
+
+// ── Modals ──
+function renderModal() {
+  const t=state.modal?.type;
+  if (t==='maal')   return modalMaal();
+  if (t==='nr')     return modalNR();
+  if (t==='tiltak') return modalTiltak();
+  if (t==='medlem') return modalMedlem();
+  return '';
+}
+
+function modalWrap(title, body, saveFn) {
+  return `<div class="backdrop" id="backdrop" onclick="if(event.target.id==='backdrop')lukkModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div style="padding:22px 24px 18px;border-bottom:1px solid #F1F5F9;display:flex;align-items:center;justify-content:space-between;">
+        <h3 class="heading" style="font-size:18px;font-weight:700;">${title}</h3>
+        <button class="btn-ghost" onclick="lukkModal()" style="font-size:16px;">✕</button>
+      </div>
+      <div style="padding:22px 24px;display:flex;flex-direction:column;gap:16px;">${body}</div>
+      <div style="padding:14px 24px 20px;border-top:1px solid #F1F5F9;display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn-secondary" onclick="lukkModal()">Avbryt</button>
+        <button class="btn-primary" onclick="${saveFn}">Lagre</button>
+      </div>
+    </div></div>`;
+}
+
+function modalMaal() {
+  const m=state.modal, o=m.id?state.objectives.find(x=>x.id===m.id):null;
+  return modalWrap(o?'Rediger mål':'Nytt mål',`
+    <div><label class="label">Tittel *</label><input class="field" id="f-tittel" placeholder="Hva vil vi oppnå?" value="${h(o?.tittel||'')}"></div>
+    <div><label class="label">Beskrivelse</label><textarea class="field" id="f-besk" rows="2" placeholder="Utfyllende beskrivelse…">${h(o?.beskrivelse||'')}</textarea></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div><label class="label">Eier</label><input class="field" id="f-eier" list="dl-m" placeholder="Velg eller skriv" value="${h(o?.eier||'')}"> ${dl('dl-m')}</div>
+      <div><label class="label">Tidsperiode</label><input class="field" id="f-periode" placeholder="f.eks. Q2 2026" value="${h(o?.periode||'')}"></div>
+    </div>`,`lagreMaal('${m.id||''}')`);
+}
+
+function modalNR() {
+  const m=state.modal, obj=state.objectives.find(x=>x.id===m.objId), kr=m.id?obj?.nrs?.find(k=>k.id===m.id):null;
+  return modalWrap(kr?'Rediger nøkkelresultat':'Nytt nøkkelresultat',`
+    <div><label class="label">Tittel *</label><input class="field" id="f-tittel" placeholder="Hva skal måles?" value="${h(kr?.tittel||'')}"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div><label class="label">Startverdi</label><input class="field" id="f-start" type="number" placeholder="0" value="${h(kr?.start??'')}"></div>
+      <div><label class="label">Nåverdi</label><input class="field" id="f-naa" type="number" placeholder="0" value="${h(kr?.naa??'')}"></div>
+      <div><label class="label">Målverdi *</label><input class="field" id="f-maal" type="number" placeholder="100" value="${h(kr?.maal??'')}"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div><label class="label">Enhet</label><input class="field" id="f-enhet" placeholder="%, kr, stk…" value="${h(kr?.enhet||'')}"></div>
+      <div><label class="label">Eier</label><input class="field" id="f-eier" list="dl-nr" placeholder="Velg eller skriv" value="${h(kr?.eier||'')}"> ${dl('dl-nr')}</div>
+    </div>`,`lagreNR('${m.id||''}','${m.objId}')`);
+}
+
+function modalTiltak() {
+  const m=state.modal, obj=state.objectives.find(x=>x.id===m.objId), kr=obj?.nrs?.find(k=>k.id===m.krId), t=m.id?kr?.tiltak?.find(x=>x.id===m.id):null;
+  const so=[['ikke-startet','Ikke startet'],['pagaar','Pågår'],['fullfort','Fullført']].map(([v,l])=>`<option value="${v}" ${(t?.status||'ikke-startet')===v?'selected':''}>${l}</option>`).join('');
+  return modalWrap(t?'Rediger tiltak':'Nytt tiltak',`
+    <div><label class="label">Tittel *</label><input class="field" id="f-tittel" placeholder="Hva skal gjøres?" value="${h(t?.tittel||'')}"></div>
+    <div><label class="label">Beskrivelse</label><textarea class="field" id="f-besk" rows="2" placeholder="Detaljer…">${h(t?.beskrivelse||'')}</textarea></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div><label class="label">Ansvarlig</label><input class="field" id="f-ansv" list="dl-t" placeholder="Velg eller skriv" value="${h(t?.ansvarlig||'')}"> ${dl('dl-t')}</div>
+      <div><label class="label">Frist</label><input class="field" id="f-frist" type="date" value="${h(t?.frist||'')}"></div>
+    </div>
+    <div><label class="label">Status</label><select class="field" id="f-status">${so}</select></div>`,
+    `lagreTiltak('${m.id||''}','${m.objId}','${m.krId}')`);
+}
+
+function modalMedlem() {
+  const m=state.modal, med=m.id?state.teamMembers.find(x=>x.id===m.id):null;
+  return modalWrap(med?'Rediger teammedlem':'Nytt teammedlem',`
+    <div><label class="label">Navn *</label><input class="field" id="f-navn" placeholder="Fullt navn" value="${h(med?.navn||'')}"></div>
+    <div><label class="label">Rolle</label><input class="field" id="f-rolle" placeholder="f.eks. Produktsjef" value="${h(med?.rolle||'')}"></div>`,
+    `lagreMedlem('${m.id||''}')`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════════════════════════
+function setView(v)     { state.view=v; render(); }
+function setFilter(k,v) { state.filter[k]=v; render(); }
+function toggleObj(id)  { state.expanded.objectives.has(id)?state.expanded.objectives.delete(id):state.expanded.objectives.add(id); render(); }
+function toggleNR(id)   { state.expanded.krs.has(id)?state.expanded.krs.delete(id):state.expanded.krs.add(id); render(); }
+function openModal(t,id=null,oId=null,kId=null) { state.modal={type:t,id,objId:oId,krId:kId}; render(); }
+function lukkModal()    { state.modal=null; render(); }
+
+function lagreMaal(id) {
+  if (!val('f-tittel')) return alert('Tittel er påkrevd');
+  const data={tittel:val('f-tittel'),beskrivelse:val('f-besk'),eier:val('f-eier'),periode:val('f-periode')};
+  if (id) Object.assign(state.objectives.find(o=>o.id===id)||{},data);
+  else state.objectives.push({id:uid(),...data,nrs:[]});
+  save(); state.modal=null; render();
+}
+function slettMaal(id) {
+  if (!confirm('Slette dette målet og alt innhold?')) return;
+  state.objectives=state.objectives.filter(o=>o.id!==id); state.expanded.objectives.delete(id); save(); render();
+}
+function lagreNR(id,oId) {
+  if (!val('f-tittel')) return alert('Tittel er påkrevd');
+  const maal=numVal('f-maal'); if (!maal||maal==='0') return alert('Målverdi er påkrevd');
+  const data={tittel:val('f-tittel'),start:numVal('f-start'),naa:numVal('f-naa'),maal,enhet:val('f-enhet'),eier:val('f-eier')};
+  const obj=state.objectives.find(o=>o.id===oId); if (!obj) return;
+  if (id) Object.assign(obj.nrs.find(k=>k.id===id)||{},data);
+  else obj.nrs.push({id:uid(),...data,tiltak:[]});
+  state.expanded.objectives.add(oId); save(); state.modal=null; render();
+}
+function slettNR(oId,kId) {
+  if (!confirm('Slette dette nøkkelresultatet og alle tiltak?')) return;
+  const obj=state.objectives.find(o=>o.id===oId); if (obj) obj.nrs=obj.nrs.filter(k=>k.id!==kId);
+  state.expanded.objectives.add(oId); save(); render();
+}
+function lagreTiltak(id,oId,kId) {
+  if (!val('f-tittel')) return alert('Tittel er påkrevd');
+  const data={tittel:val('f-tittel'),beskrivelse:val('f-besk'),ansvarlig:val('f-ansv'),frist:val('f-frist'),status:document.getElementById('f-status')?.value||'ikke-startet'};
+  const obj=state.objectives.find(o=>o.id===oId), kr=obj?.nrs?.find(k=>k.id===kId); if (!kr) return;
+  if (id) Object.assign(kr.tiltak.find(t=>t.id===id)||{},data);
+  else kr.tiltak.push({id:uid(),...data});
+  state.expanded.objectives.add(oId); state.expanded.krs.add(kId); save(); state.modal=null; render();
+}
+function slettTiltak(oId,kId,tId) {
+  if (!confirm('Slette dette tiltaket?')) return;
+  const obj=state.objectives.find(o=>o.id===oId), kr=obj?.nrs?.find(k=>k.id===kId);
+  if (kr) kr.tiltak=kr.tiltak.filter(t=>t.id!==tId);
+  state.expanded.objectives.add(oId); state.expanded.krs.add(kId); save(); render();
+}
+function lagreMedlem(id) {
+  if (!val('f-navn')) return alert('Navn er påkrevd');
+  const data={navn:val('f-navn'),rolle:val('f-rolle')};
+  if (id) Object.assign(state.teamMembers.find(m=>m.id===id)||{},data);
+  else state.teamMembers.push({id:uid(),...data});
+  save(); state.modal=null; render();
+}
+function slettMedlem(id) {
+  if (!confirm('Slette dette teammedlemmet?')) return;
+  state.teamMembers=state.teamMembers.filter(m=>m.id!==id); save(); render();
+}
+function eksporter() {
+  const b=new Blob([JSON.stringify({teamMembers:state.teamMembers,objectives:state.objectives},null,2)],{type:'application/json'});
+  const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(b),download:`okr-${new Date().toISOString().slice(0,10)}.json`});
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function importer(event) {
+  const f=event.target.files[0]; if (!f) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    try {
+      const d=JSON.parse(e.target.result);
+      if (!confirm('Dette vil overskrive alle eksisterende data. Fortsette?')) return;
+      state.teamMembers=d.teamMembers||[]; state.objectives=d.objectives||[]; save(); render();
+    } catch { alert('Ugyldig JSON-fil'); }
+  };
+  r.readAsText(f);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// OPPSTART
+// ═══════════════════════════════════════════════════════════════
+async function init() {
+  const msg = document.getElementById('loading-msg');
+
+  // 1. Les synk-state og PAT fra localStorage
+  loadSync();
+
+  // 2. Les bufrede app-data fra localStorage
+  load();
+
+  if (konfOK()) {
+    // 3. Hent fersk data fra GitHub
+    if (msg) msg.textContent = `Henter data fra GitHub (${CONF.owner}/${CONF.repo})…`;
+    await fetchFraGitHub();
+
+    if (sync.status === 'feil') {
+      if (msg) msg.textContent = 'GitHub-henting feilet — viser lokalt bufrede data';
+      await new Promise(r => setTimeout(r, 1200));
+    }
+  } else {
+    if (msg) msg.textContent = window.__confMangler
+      ? 'conf.js ikke funnet — kjører i lokal modus'
+      : 'Laster lokale data…';
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  // 4. Skjul lasteskjerm og vis app
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display     = 'block';
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
