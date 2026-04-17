@@ -47,7 +47,7 @@ window.OKR_CONFIG = {
     //   ❌ Feil:    "https://github.com/jensholmsen"  ← ikke URL
     //   ❌ Feil:    "@jensholmsen"                    ← ikke @
     //
-    owner: "eGovGeek",
+    owner: "egovgeeks",
 
     // ── repo ── PÅKREVD ─────────────────────────────────────────
     //
