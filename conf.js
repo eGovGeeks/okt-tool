@@ -7,7 +7,7 @@
  * Verktøyet leser denne filen automatisk ved oppstart.
  *
  * ──────────────────────────────────────────────────────────────
- *  FREMGANGSMÅTE
+ *  FREMGANGSMÅTE 
  * ──────────────────────────────────────────────────────────────
  *  1. Fyll inn "owner" og "repo" nedenfor (påkrevd).
  *  2. Juster "branch" og "dataFile" ved behov (valgfritt).
@@ -47,7 +47,7 @@ window.OKR_CONFIG = {
     //   ❌ Feil:    "https://github.com/jensholmsen"  ← ikke URL
     //   ❌ Feil:    "@jensholmsen"                    ← ikke @
     //
-    owner: "",
+    owner: "eGovGeek",
 
     // ── repo ── PÅKREVD ─────────────────────────────────────────
     //
