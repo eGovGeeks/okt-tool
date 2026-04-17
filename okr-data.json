@@ -1,0 +1,73 @@
+{
+  "teamMembers": [
+    {
+      "id": "mo3e4vmb9phjq",
+      "navn": "Frank",
+      "rolle": "test"
+    },
+    {
+      "id": "mo3e5259j8x2s",
+      "navn": "Hans",
+      "rolle": "test"
+    }
+  ],
+  "objectives": [
+    {
+      "id": "mo3e5w6u2awz2",
+      "tittel": "Vinne VM",
+      "beskrivelse": "",
+      "eier": "Frank",
+      "periode": "Q3 2026",
+      "nrs": [
+        {
+          "id": "mo3e6pyxvamjj",
+          "tittel": "Vinne pulje",
+          "start": "0",
+          "naa": "0",
+          "maal": "100",
+          "enhet": "",
+          "eier": "Frank",
+          "tiltak": [
+            {
+              "id": "mo3e7t4qjm1bi",
+              "tittel": "Møte til kamp",
+              "beskrivelse": "",
+              "ansvarlig": "Hans",
+              "frist": "2026-04-18",
+              "status": "ikke-startet"
+            }
+          ]
+        },
+        {
+          "id": "mo3e79u9i1mmi",
+          "tittel": "Vinne sluttspillet",
+          "start": "0",
+          "naa": "0",
+          "maal": "100",
+          "enhet": "",
+          "eier": "Hans",
+          "tiltak": []
+        }
+      ]
+    },
+    {
+      "id": "mo3e8n6zw2bpi",
+      "tittel": "Plante busker",
+      "beskrivelse": "",
+      "eier": "Hans",
+      "periode": "Q4 2026",
+      "nrs": [
+        {
+          "id": "mo3e95mk5xofj",
+          "tittel": "Kjøpe jord",
+          "start": "0",
+          "naa": "0",
+          "maal": "100",
+          "enhet": "",
+          "eier": "Hans",
+          "tiltak": []
+        }
+      ]
+    }
+  ]
+}
