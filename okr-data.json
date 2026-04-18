@@ -39,7 +39,23 @@
               "beskrivelse": "",
               "ansvarlig": "Hans",
               "frist": "2026-04-18",
-              "status": "ikke-startet"
+              "status": "fullfort"
+            },
+            {
+              "id": "mo46cn4zdlcxj",
+              "tittel": "Møte til kamp",
+              "beskrivelse": "",
+              "ansvarlig": "Frank",
+              "frist": "",
+              "status": "fullfort"
+            },
+            {
+              "id": "mo46cxqxrr4pc",
+              "tittel": "Møte til kamp",
+              "beskrivelse": "",
+              "ansvarlig": "Grete",
+              "frist": "",
+              "status": "fullfort"
             }
           ]
         },
